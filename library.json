@@ -1,0 +1,23 @@
+{
+  "name": "ESPAsyncHTTPClient",
+  "version": "1.0.0",
+  "description": "A simple lightweight HTTP client based on ESPAsyncTCP library",
+  "keywords": ["async", "http", "ssl", "esp8266", "esp32"],
+  "authors": [
+    {
+      "name": "Alex Bratchik",
+      "url": "https://github.com/abratchik",
+      "maintainer": true
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abratchik/ESPAsyncHTTPClient.git"
+  },
+  "license": "LGPL-3.0",
+  "frameworks": ["arduino"],
+  "platforms": ["espressif8266", "espressif32"],
+  "build": {
+    "srcFilter": ["+<src/>", "+<*.h>", "+<*.cpp>", "-<tests/>"]
+  }
+}
