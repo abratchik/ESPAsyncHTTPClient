@@ -12,8 +12,7 @@ AsyncHTTPClient::AsyncHTTPClient()
     , _useHTTP10(false)
     , _statusCode(0)
     , _contentLength(0)
-    , _transferEncoding(HTTPC_TE_IDENTITY)
-{
+    , _transferEncoding(HTTPC_TE_IDENTITY)    , _chunkSize(0){
     _userAgent = "AsyncHTTPClient";
 }
 
@@ -42,11 +41,7 @@ bool AsyncHTTPClient::begin(const String& host, uint16_t port, const String& uri
 }
 
 void AsyncHTTPClient::end() {
-    if (_client) {
-        _client->close();
-        delete _client;
-        _client = nullptr;
-    }
+    _releaseClient();
     _state = STATE_IDLE;
     _headers.clear();
     _collectHeaders.clear();
@@ -75,7 +70,7 @@ bool AsyncHTTPClient::_parseURL(const String& url) {
     int pathStart = url.indexOf('/', hostStart);
     if (pathStart == -1) {
         _host = url.substring(hostStart);
-        _uri = "/";
+        _uri = default_uri;
     } else {
         _host = url.substring(hostStart, pathStart);
         _uri = url.substring(pathStart);
@@ -94,97 +89,107 @@ bool AsyncHTTPClient::_parseURL(const String& url) {
     return true;
 }
 
-void AsyncHTTPClient::GET(OnResponseCallback onComplete, OnErrorCallback onError) {
+void AsyncHTTPClient::GET(const String& uri,  OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = "GET";
     _payload = "";
     _payloadSize = 0;
     _onComplete = onComplete;
     _onError = onError;
+    _uri = uri.isEmpty() ? _uri : uri; // Override URI if provided
     _sendRequest();
 }
 
-void AsyncHTTPClient::POST(const String& payload, OnResponseCallback onComplete, OnErrorCallback onError) {
+void AsyncHTTPClient::POST(const String& payload, const String& uri,  OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = "POST";
     _payload = payload;
     _payloadSize = payload.length();
     _onComplete = onComplete;
     _onError = onError;
+    _uri = uri.isEmpty() ? _uri : uri; 
     _sendRequest();
 }
 
-void AsyncHTTPClient::POST(const uint8_t* payload, size_t size, OnResponseCallback onComplete, OnErrorCallback onError) {
+void AsyncHTTPClient::POST(const uint8_t* payload, size_t size, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = "POST";
     _payload = String();
     _payload.concat((const char*)payload, size);
     _payloadSize = size;
     _onComplete = onComplete;
     _onError = onError;
+    _uri = uri.isEmpty() ? _uri : uri; 
     _sendRequest();
 }
 
-void AsyncHTTPClient::PUT(const String& payload, OnResponseCallback onComplete, OnErrorCallback onError) {
+void AsyncHTTPClient::PUT(const String& payload, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = "PUT";
     _payload = payload;
     _payloadSize = payload.length();
     _onComplete = onComplete;
     _onError = onError;
+    _uri = uri.isEmpty() ? _uri : uri; 
     _sendRequest();
 }
 
-void AsyncHTTPClient::PUT(const uint8_t* payload, size_t size, OnResponseCallback onComplete, OnErrorCallback onError) {
+void AsyncHTTPClient::PUT(const uint8_t* payload, size_t size, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = "PUT";
     _payload = String();
     _payload.concat((const char*)payload, size);
     _payloadSize = size;
     _onComplete = onComplete;
     _onError = onError;
+    _uri = uri.isEmpty() ? _uri : uri; 
     _sendRequest();
 }
 
-void AsyncHTTPClient::PATCH(const String& payload, OnResponseCallback onComplete, OnErrorCallback onError) {
+void AsyncHTTPClient::PATCH(const String& payload, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = "PATCH";
     _payload = payload;
     _payloadSize = payload.length();
     _onComplete = onComplete;
     _onError = onError;
+    _uri = uri.isEmpty() ? _uri : uri; 
     _sendRequest();
 }
 
-void AsyncHTTPClient::PATCH(const uint8_t* payload, size_t size, OnResponseCallback onComplete, OnErrorCallback onError) {
+void AsyncHTTPClient::PATCH(const uint8_t* payload, size_t size, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = "PATCH";
     _payload = String();
     _payload.concat((const char*)payload, size);
     _payloadSize = size;
     _onComplete = onComplete;
     _onError = onError;
+    _uri = uri.isEmpty() ? _uri : uri; 
     _sendRequest();
 }
 
-void AsyncHTTPClient::DELETE(OnResponseCallback onComplete, OnErrorCallback onError) {
+void AsyncHTTPClient::DELETE(const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = "DELETE";
     _payload = "";
     _payloadSize = 0;
     _onComplete = onComplete;
     _onError = onError;
+    _uri = uri.isEmpty() ? _uri : uri; 
     _sendRequest();
 }
 
-void AsyncHTTPClient::sendRequest(const char* type, const String& payload, OnResponseCallback onComplete, OnErrorCallback onError) {
+void AsyncHTTPClient::sendRequest(const char* type, const String& payload, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = type;
     _payload = payload;
     _payloadSize = payload.length();
     _onComplete = onComplete;
     _onError = onError;
+    _uri = uri.isEmpty() ? _uri : uri; 
     _sendRequest();
 }
 
-void AsyncHTTPClient::sendRequest(const char* type, const uint8_t* payload, size_t size, OnResponseCallback onComplete, OnErrorCallback onError) {
+void AsyncHTTPClient::sendRequest(const char* type, const uint8_t* payload, size_t size, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = type;
     _payload = String();
     _payload.concat((const char*)payload, size);
     _payloadSize = size;
     _onComplete = onComplete;
     _onError = onError;
+    _uri = uri.isEmpty() ? _uri : uri; 
     _sendRequest();
 }
 
@@ -201,8 +206,9 @@ void AsyncHTTPClient::_sendRequest() {
     _contentLength = 0;
     _transferEncoding = HTTPC_TE_IDENTITY;
     _location = "";
+    _chunkSize = 0;
+    _chunkBuffer = "";
     
-    // Create client
     if (!_client) {
         _client = new AsyncClient();
         // Set callbacks
@@ -210,19 +216,26 @@ void AsyncHTTPClient::_sendRequest() {
         _client->onDisconnect(_onDisconnectCB, this);
         _client->onData(_onDataCB, this);
         _client->onError(_onErrorCB, this);
-    }
 
-    // Connect
-    _transitionState(STATE_CONNECTING);
+        _client->setRxTimeout(_timeout);
+    }
 
     DEBUG_ASYNC_HTTP("Connecting to %s:%d\n", _host.c_str(), _port);
 
-#if ASYNC_TCP_SSL_ENABLED
-    if (!_client->connect(_host.c_str(), _port, _use_tls)) {
-#else
-    if (!_client->connect(_host.c_str(), _port)) {
-#endif
-        _failRequest("Connection failed");
+    if(!_client->connected()) {
+        // Connect
+        _transitionState(STATE_CONNECTING);
+    #if ASYNC_TCP_SSL_ENABLED
+        if (!_client->connect(_host.c_str(), _port, _use_tls)) 
+    #else
+        if (!_client->connect(_host.c_str(), _port)) 
+    #endif
+        {
+            _failRequest("Connection failed");
+        }
+    }
+    else {
+        _handleConnect(); // Already connected (e.g. connection reuse) - skip straight to sending request
     }
 }
 
@@ -233,10 +246,15 @@ void AsyncHTTPClient::_transitionState(State newState) {
 
 void AsyncHTTPClient::_completeRequest() {
     _transitionState(STATE_COMPLETE);
+    
+    // Call callback BEFORE any cleanup
     if (_onComplete) {
         _onComplete(_statusCode, _responseBody);
     }
+    
+    // Transition back to IDLE
     _transitionState(STATE_IDLE);
+    
 }
 
 void AsyncHTTPClient::_failRequest(const String& error) {
@@ -244,6 +262,8 @@ void AsyncHTTPClient::_failRequest(const String& error) {
     if (_onError) {
         _onError(error);
     }
+    
+    // Do NOT close from callback context - let it close naturally
     _transitionState(STATE_IDLE);
 }
 
@@ -286,9 +306,16 @@ void AsyncHTTPClient::_handleConnect() {
 }
 
 void AsyncHTTPClient::_handleDisconnect() {
-    // Handle disconnection
+    // Handle disconnection - complete request if we were waiting for data
     if (_state == STATE_RECEIVING_BODY || _state == STATE_RECEIVING_HEADERS) {
-        _completeRequest();
+        _transitionState(STATE_COMPLETE);
+        if (_onComplete) {
+            _onComplete(_statusCode, _responseBody);
+        }
+        _transitionState(STATE_IDLE);
+    } else if (_state != STATE_IDLE) {
+        // If we're in an error state or other state, just go idle
+        _transitionState(STATE_IDLE);
     }
 }
 
@@ -326,14 +353,20 @@ void AsyncHTTPClient::_handleData(void* data, size_t len) {
             }
         }
     } else if (_state == STATE_RECEIVING_BODY) {
-        _responseBody.concat((char*)data, len);
-        if (_contentLength > 0 && _responseBody.length() >= _contentLength) {
-            _completeRequest();
+        if (_transferEncoding == HTTPC_TE_IDENTITY) {
+            _responseBody.concat((char*)data, len);
+            if (_contentLength > 0 && _responseBody.length() >= _contentLength) {
+                _completeRequest();
+            }
+        } else if (_transferEncoding == HTTPC_TE_CHUNKED) {
+            _chunkBuffer.concat((char*)data, len);
+            _parseChunks();
         }
     }
 }
 
 void AsyncHTTPClient::_handleError(int error) {
+    if (_state == STATE_IDLE) return;  // Ignore errors after request completion
     _failRequest("Connection error: " + String(error));
 }
 
@@ -388,6 +421,45 @@ void AsyncHTTPClient::_parseHeaders() {
                 if (value.equalsIgnoreCase("chunked")) {
                     _transferEncoding = HTTPC_TE_CHUNKED;
                 }
+            }
+        }
+    }
+}
+
+void AsyncHTTPClient::_parseChunks() {
+    while (_chunkBuffer.length() > 0) {
+        if (_chunkSize == 0) {
+            // Looking for chunk size
+            int rn = _chunkBuffer.indexOf("\r\n");
+            if (rn == -1) {
+                // Need more data
+                break;
+            }
+            String sizeLine = _chunkBuffer.substring(0, rn);
+            _chunkBuffer = _chunkBuffer.substring(rn + 2);
+            
+            // Parse hex size
+            char* endptr;
+            _chunkSize = strtol(sizeLine.c_str(), &endptr, 16);
+            
+            if (_chunkSize == 0) {
+                // Last chunk, check for trailing \r\n\r\n
+                if (_chunkBuffer.startsWith("\r\n")) {
+                    _chunkBuffer = _chunkBuffer.substring(2);
+                }
+                _completeRequest();
+                break;
+            }
+        } else {
+            // Reading chunk data
+            if (_chunkBuffer.length() >= _chunkSize + 2) { // +2 for \r\n
+                String chunkData = _chunkBuffer.substring(0, _chunkSize);
+                _responseBody += chunkData;
+                _chunkBuffer = _chunkBuffer.substring(_chunkSize + 2); // Skip \r\n
+                _chunkSize = 0; // Next chunk size
+            } else {
+                // Need more data for this chunk
+                break;
             }
         }
     }
@@ -506,8 +578,16 @@ const String& AsyncHTTPClient::getLocation() const {
 }
 
 void AsyncHTTPClient::abort() {
-    if (_client) {
-        _client->close();
+    if(_client) {
+        _client->abort();
     }
     _transitionState(STATE_IDLE);
+}
+
+void AsyncHTTPClient::_releaseClient(bool immediately) {
+    if (_client) {
+        _client->close(immediately);
+        delete _client;
+        _client = nullptr;
+    }
 }

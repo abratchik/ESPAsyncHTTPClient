@@ -4,6 +4,7 @@
 #include <ESPAsyncTCP.h>
 #include <functional>
 #include <vector>
+#include <cstdlib>
 
 #if DEBUG_ESP_ASYNC_HTTP_CLIENT && (DEBUG_ESP_PORT == Serial)
 #define DEBUG_ASYNC_HTTP(format, ...) DEBUG_GENERIC_F("[ASYNC_HTTP]", format, ##__VA_ARGS__)
@@ -101,6 +102,8 @@ typedef enum {
 using OnResponseCallback = std::function<void(int statusCode, const String& body)>;
 using OnErrorCallback = std::function<void(const String& error)>;
 
+const String default_uri = "/";
+
 class AsyncHTTPClient {
 public:
     AsyncHTTPClient();
@@ -110,20 +113,20 @@ public:
 
     // Initialization
     bool begin(const String& url);
-    bool begin(const String& host, uint16_t port, const String& uri, bool https = false);
+    bool begin(const String& host, uint16_t port, const String& uri = default_uri, bool https = false);
     void end();
 
     // HTTP Methods
-    void GET(OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
-    void POST(const String& payload, OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
-    void POST(const uint8_t* payload, size_t size, OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
-    void PUT(const String& payload, OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
-    void PUT(const uint8_t* payload, size_t size, OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
-    void PATCH(const String& payload, OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
-    void PATCH(const uint8_t* payload, size_t size, OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
-    void DELETE(OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
-    void sendRequest(const char* type, const String& payload = "", OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
-    void sendRequest(const char* type, const uint8_t* payload, size_t size, OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
+    void GET(const String& uri = "", OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
+    void POST(const String& payload, const String& uri = "", OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
+    void POST(const uint8_t* payload, size_t size, const String& uri = "", OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
+    void PUT(const String& payload, const String& uri = "", OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
+    void PUT(const uint8_t* payload, size_t size, const String& uri = "", OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
+    void PATCH(const String& payload, const String& uri = "", OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
+    void PATCH(const uint8_t* payload, size_t size, const String& uri = "", OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
+    void DELETE(const String& uri = "", OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
+    void sendRequest(const char* type, const String& payload = "", const String& uri = "", OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
+    void sendRequest(const char* type, const uint8_t* payload, size_t size, const String& uri = "", OnResponseCallback onComplete = nullptr, OnErrorCallback onError = nullptr);
 
     // Header Management
     void addHeader(const String& name, const String& value, bool first = false, bool replace = true);
@@ -199,12 +202,18 @@ private:
     transferEncoding_t _transferEncoding;
     String _location;
 
+    // Chunked transfer encoding
+    size_t _chunkSize;
+    String _chunkBuffer;
+
     // Callbacks
     OnResponseCallback _onComplete;
     OnErrorCallback _onError;
 
     // Internal methods
     bool _parseURL(const String& url);
+    void _parseChunks();
+    void _releaseClient(bool immediately = false);
     void _buildRequest();
     void _sendRequest();
     void _handleConnect();

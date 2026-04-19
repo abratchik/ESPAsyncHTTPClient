@@ -21,7 +21,7 @@ void setup() {
     if (httpClient.begin("http://httpbin.org/get")) {
 #endif
         Serial.println("Making GET request...");
-        httpClient.GET(
+        httpClient.GET("",
             [](int statusCode, const String& body) {
                 Serial.printf("Response status: %d\n", statusCode);
                 Serial.println("Response body:");
