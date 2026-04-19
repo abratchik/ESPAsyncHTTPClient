@@ -32,6 +32,10 @@ bool AsyncHTTPClient::begin(const String& host, uint16_t port, const String& uri
     _host = host;
     _port = port;
     _uri = uri;
+    if(https && !ASYNC_TCP_SSL_ENABLED) {
+        DEBUG_ASYNC_HTTP("HTTPS not supported in this build\n");
+        return false;
+     }
     _use_tls = https;
     if (_use_tls && _port == 80) _port = 443;
     return true;
@@ -58,7 +62,14 @@ bool AsyncHTTPClient::_parseURL(const String& url) {
     if (protocolEnd == -1) return false;
     
     String protocol = url.substring(0, protocolEnd);
-    _use_tls = (protocol == "https");
+    if(protocol == "https" && ASYNC_TCP_SSL_ENABLED) {
+        _use_tls = true;
+    } else if(protocol == "http") {
+        _use_tls = false;
+    } else {
+        DEBUG_ASYNC_HTTP("Unsupported protocol: %s\n", protocol.c_str());
+        return false; 
+    }
     
     int hostStart = protocolEnd + 3;
     int pathStart = url.indexOf('/', hostStart);
@@ -103,7 +114,8 @@ void AsyncHTTPClient::POST(const String& payload, OnResponseCallback onComplete,
 
 void AsyncHTTPClient::POST(const uint8_t* payload, size_t size, OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = "POST";
-    _payload = String((const char*)payload);
+    _payload = String();
+    _payload.concat((const char*)payload, size);
     _payloadSize = size;
     _onComplete = onComplete;
     _onError = onError;
@@ -121,7 +133,8 @@ void AsyncHTTPClient::PUT(const String& payload, OnResponseCallback onComplete, 
 
 void AsyncHTTPClient::PUT(const uint8_t* payload, size_t size, OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = "PUT";
-    _payload = String((const char*)payload);
+    _payload = String();
+    _payload.concat((const char*)payload, size);
     _payloadSize = size;
     _onComplete = onComplete;
     _onError = onError;
@@ -139,7 +152,8 @@ void AsyncHTTPClient::PATCH(const String& payload, OnResponseCallback onComplete
 
 void AsyncHTTPClient::PATCH(const uint8_t* payload, size_t size, OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = "PATCH";
-    _payload = String((const char*)payload);
+    _payload = String();
+    _payload.concat((const char*)payload, size);
     _payloadSize = size;
     _onComplete = onComplete;
     _onError = onError;
@@ -166,7 +180,8 @@ void AsyncHTTPClient::sendRequest(const char* type, const String& payload, OnRes
 
 void AsyncHTTPClient::sendRequest(const char* type, const uint8_t* payload, size_t size, OnResponseCallback onComplete, OnErrorCallback onError) {
     _method = type;
-    _payload = String((const char*)payload);
+    _payload = String();
+    _payload.concat((const char*)payload, size);
     _payloadSize = size;
     _onComplete = onComplete;
     _onError = onError;
@@ -199,6 +214,8 @@ void AsyncHTTPClient::_sendRequest() {
 
     // Connect
     _transitionState(STATE_CONNECTING);
+
+    DEBUG_ASYNC_HTTP("Connecting to %s:%d\n", _host.c_str(), _port);
 
 #if ASYNC_TCP_SSL_ENABLED
     if (!_client->connect(_host.c_str(), _port, _use_tls)) {
@@ -276,16 +293,40 @@ void AsyncHTTPClient::_handleDisconnect() {
 }
 
 void AsyncHTTPClient::_handleData(void* data, size_t len) {
-    char* buf = (char*)data;
+    if (len == 0) {
+        return;
+    }
     
     if (_state == STATE_RECEIVING_HEADERS) {
-        _responseHeaders += String(buf);
+        String newData;
+        newData.concat((char*)data, len);
+        _responseHeaders += newData;
+        
+        bool headerComplete = false;
         if (_responseHeaders.indexOf("\r\n\r\n") != -1) {
+            headerComplete = true;
+        } else if (_responseHeaders.length() >= 4 && 
+                   _responseHeaders.endsWith("\r\n\r") && 
+                   newData.startsWith("\n")) {
+            // Handle case where "\r\n\r\n" is split across packets
+            headerComplete = true;
+        }
+        
+        if (headerComplete) {
             _parseHeaders();
-            _transitionState(STATE_RECEIVING_BODY);
+            // If there's body data in the same packet, append it
+            if (_responseHeaders.length() > 0) {
+                _responseBody += _responseHeaders;
+                _responseHeaders = "";
+            }
+            if (_contentLength == 0) {
+                _completeRequest();
+            } else {
+                _transitionState(STATE_RECEIVING_BODY);
+            }
         }
     } else if (_state == STATE_RECEIVING_BODY) {
-        _responseBody += String(buf);
+        _responseBody.concat((char*)data, len);
         if (_contentLength > 0 && _responseBody.length() >= _contentLength) {
             _completeRequest();
         }

@@ -15,7 +15,11 @@ void setup() {
     }
     Serial.printf("Connected to WiFi, local IP: %s\n", WiFi.localIP().toString().c_str());
 
+#if ASYNC_TCP_SSL_ENABLED
+    if (httpClient.begin("https://httpbin.org/get")) {
+#else
     if (httpClient.begin("http://httpbin.org/get")) {
+#endif
         Serial.println("Making GET request...");
         httpClient.GET(
             [](int statusCode, const String& body) {
@@ -28,7 +32,7 @@ void setup() {
             }
         );
     } else {
-        Serial.println("Failed to begin HTTP client");
+        Serial.println("Failed to init HTTP client");
     }
 }
 
