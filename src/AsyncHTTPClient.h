@@ -215,7 +215,7 @@ private:
     void _parseChunks();
     void _releaseClient(bool immediately = false);
     void _buildRequest();
-    void _sendRequest();
+    void _sendRequest(const char* type, const String& payload, size_t size, const String& uri,  OnResponseCallback onComplete, OnErrorCallback onError);
     void _handleConnect();
     void _handleDisconnect();
     void _handleData(void* data, size_t len);

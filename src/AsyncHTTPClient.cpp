@@ -5,7 +5,7 @@ AsyncHTTPClient::AsyncHTTPClient()
     , _use_tls(false)
     , _state(STATE_IDLE)
     , _port(80)
-    , _timeout(5000)
+    , _timeout(5)
     , _followRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS)
     , _redirectLimit(10)
     , _reuse(true)
@@ -90,115 +90,60 @@ bool AsyncHTTPClient::_parseURL(const String& url) {
 }
 
 void AsyncHTTPClient::GET(const String& uri,  OnResponseCallback onComplete, OnErrorCallback onError) {
-    _method = "GET";
-    _payload = "";
-    _payloadSize = 0;
-    _onComplete = onComplete;
-    _onError = onError;
-    _uri = uri.isEmpty() ? _uri : uri; // Override URI if provided
-    _sendRequest();
+    _sendRequest("GET", "", 0, _uri, onComplete, onError);
 }
 
 void AsyncHTTPClient::POST(const String& payload, const String& uri,  OnResponseCallback onComplete, OnErrorCallback onError) {
-    _method = "POST";
-    _payload = payload;
-    _payloadSize = payload.length();
-    _onComplete = onComplete;
-    _onError = onError;
-    _uri = uri.isEmpty() ? _uri : uri; 
-    _sendRequest();
+    _sendRequest("POST", payload, payload.length(), uri, onComplete, onError);
 }
 
 void AsyncHTTPClient::POST(const uint8_t* payload, size_t size, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
-    _method = "POST";
-    _payload = String();
-    _payload.concat((const char*)payload, size);
-    _payloadSize = size;
-    _onComplete = onComplete;
-    _onError = onError;
-    _uri = uri.isEmpty() ? _uri : uri; 
-    _sendRequest();
+    sendRequest("POST", payload, size, uri, onComplete, onError);
 }
 
 void AsyncHTTPClient::PUT(const String& payload, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
-    _method = "PUT";
-    _payload = payload;
-    _payloadSize = payload.length();
-    _onComplete = onComplete;
-    _onError = onError;
-    _uri = uri.isEmpty() ? _uri : uri; 
-    _sendRequest();
+    _sendRequest("PUT", payload, payload.length(), uri, onComplete, onError);
 }
 
 void AsyncHTTPClient::PUT(const uint8_t* payload, size_t size, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
-    _method = "PUT";
-    _payload = String();
-    _payload.concat((const char*)payload, size);
-    _payloadSize = size;
-    _onComplete = onComplete;
-    _onError = onError;
-    _uri = uri.isEmpty() ? _uri : uri; 
-    _sendRequest();
+    sendRequest("PUT", payload, size, uri, onComplete, onError);
 }
 
 void AsyncHTTPClient::PATCH(const String& payload, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
-    _method = "PATCH";
-    _payload = payload;
-    _payloadSize = payload.length();
-    _onComplete = onComplete;
-    _onError = onError;
-    _uri = uri.isEmpty() ? _uri : uri; 
-    _sendRequest();
+    _sendRequest("PATCH", payload, payload.length(), uri, onComplete, onError);
 }
 
 void AsyncHTTPClient::PATCH(const uint8_t* payload, size_t size, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
-    _method = "PATCH";
-    _payload = String();
-    _payload.concat((const char*)payload, size);
-    _payloadSize = size;
-    _onComplete = onComplete;
-    _onError = onError;
-    _uri = uri.isEmpty() ? _uri : uri; 
-    _sendRequest();
+    sendRequest("PATCH", payload, size, uri, onComplete, onError);
 }
 
 void AsyncHTTPClient::DELETE(const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
-    _method = "DELETE";
-    _payload = "";
-    _payloadSize = 0;
-    _onComplete = onComplete;
-    _onError = onError;
-    _uri = uri.isEmpty() ? _uri : uri; 
-    _sendRequest();
+    _sendRequest("DELETE", "", 0, uri, onComplete, onError);
 }
 
 void AsyncHTTPClient::sendRequest(const char* type, const String& payload, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
-    _method = type;
-    _payload = payload;
-    _payloadSize = payload.length();
-    _onComplete = onComplete;
-    _onError = onError;
-    _uri = uri.isEmpty() ? _uri : uri; 
-    _sendRequest();
+    _sendRequest(type, payload, payload.length(), uri, onComplete, onError);
 }
 
 void AsyncHTTPClient::sendRequest(const char* type, const uint8_t* payload, size_t size, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
-    _method = type;
     _payload = String();
     _payload.concat((const char*)payload, size);
-    _payloadSize = size;
-    _onComplete = onComplete;
-    _onError = onError;
-    _uri = uri.isEmpty() ? _uri : uri; 
-    _sendRequest();
+    _sendRequest(type, _payload, size, uri, onComplete, onError);
 }
 
-void AsyncHTTPClient::_sendRequest() {
+void AsyncHTTPClient::_sendRequest(const char* type, const String& payload, size_t size, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
     if (_state != STATE_IDLE) {
         _failRequest("Request already in progress");
         return;
     }
-    
+
+    _method = type;
+    _payload = payload;
+    _payloadSize = size;
+    _uri = uri.isEmpty() ? _uri : uri;
+    _onComplete = onComplete;
+    _onError = onError;
+
     // Reset response data
     _statusCode = 0;
     _responseHeaders = "";
@@ -307,6 +252,8 @@ void AsyncHTTPClient::_handleConnect() {
 
 void AsyncHTTPClient::_handleDisconnect() {
     // Handle disconnection - complete request if we were waiting for data
+    DEBUG_ASYNC_HTTP("Disconnected from %s, state=%d\n", _host.c_str(), _state);
+
     if (_state == STATE_RECEIVING_BODY || _state == STATE_RECEIVING_HEADERS) {
         _transitionState(STATE_COMPLETE);
         if (_onComplete) {
@@ -366,7 +313,7 @@ void AsyncHTTPClient::_handleData(void* data, size_t len) {
 }
 
 void AsyncHTTPClient::_handleError(int error) {
-    if (_state == STATE_IDLE) return;  // Ignore errors after request completion
+    // if (_state == STATE_IDLE) return;  // Ignore errors after request completion
     _failRequest("Connection error: " + String(error));
 }
 
