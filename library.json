@@ -2,7 +2,7 @@
   "name": "ESPAsyncHTTPClient",
   "version": "1.0.0",
   "description": "A simple lightweight HTTP client based on ESPAsyncTCP library",
-  "keywords": ["async", "http", "ssl", "esp8266", "esp32"],
+  "keywords": ["async", "http", "https", "tls", "ssl", "esp8266", "esp32"],
   "authors": [
     {
       "name": "Alex Bratchik",
