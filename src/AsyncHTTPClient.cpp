@@ -133,7 +133,7 @@ void AsyncHTTPClient::sendRequest(const char* type, const uint8_t* payload, size
 
 void AsyncHTTPClient::_sendRequest(const char* type, const String& payload, size_t size, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
     if (_state != STATE_IDLE) {
-        _failRequest("Request already in progress");
+        _failRequest(ERR_ALREADY);
         return;
     }
 
@@ -176,7 +176,7 @@ void AsyncHTTPClient::_sendRequest(const char* type, const String& payload, size
         if (!_client->connect(_host.c_str(), _port)) 
     #endif
         {
-            _failRequest("Connection failed");
+            _failRequest(ERR_CONN);
         }
     }
     else {
@@ -202,10 +202,10 @@ void AsyncHTTPClient::_completeRequest() {
     
 }
 
-void AsyncHTTPClient::_failRequest(const String& error) {
+void AsyncHTTPClient::_failRequest(int errorCode) {
     _transitionState(STATE_ERROR);
     if (_onError) {
-        _onError(error);
+        _onError(errorCode);
     }
     
     // Do NOT close from callback context - let it close naturally
@@ -314,7 +314,7 @@ void AsyncHTTPClient::_handleData(void* data, size_t len) {
 
 void AsyncHTTPClient::_handleError(int error) {
     // if (_state == STATE_IDLE) return;  // Ignore errors after request completion
-    _failRequest("Connection error: " + String(error));
+    _failRequest(error);
 }
 
 void AsyncHTTPClient::_buildRequest() {

@@ -27,8 +27,8 @@ void setup() {
                 Serial.println("Response body:");
                 Serial.println(body);
             },
-            [](const String& error) {
-                Serial.println("Error: " + error);
+            [](int errorCode) {
+                Serial.println("Error: " + errorCode);
             }
         );
     } else {

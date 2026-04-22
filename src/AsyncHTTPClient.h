@@ -100,7 +100,7 @@ typedef enum {
 
 // Callback types for async responses
 using OnResponseCallback = std::function<void(int statusCode, const String& body)>;
-using OnErrorCallback = std::function<void(const String& error)>;
+using OnErrorCallback = std::function<void(int statusCode)>;
 
 const String default_uri = "/";
 
@@ -224,7 +224,7 @@ private:
     void _parseHeaders();
     void _transitionState(State newState);
     void _completeRequest();
-    void _failRequest(const String& error);
+    void _failRequest(int errorCode);
     static void _onConnectCB(void* arg, AsyncClient* client);
     static void _onDisconnectCB(void* arg, AsyncClient* client);
     static void _onDataCB(void* arg, AsyncClient* client, void* data, size_t len);
