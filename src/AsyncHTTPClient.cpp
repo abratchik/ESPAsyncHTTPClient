@@ -512,6 +512,10 @@ int AsyncHTTPClient::getStatusCode() const {
     return _statusCode;
 }
 
+const String& AsyncHTTPClient::getUri() const {
+    return _uri;
+}
+
 const String& AsyncHTTPClient::getString() const {
     return _responseBody;
 }

@@ -151,6 +151,7 @@ public:
     // Status
     bool connected() const;
     int getStatusCode() const;
+    const String& getUri() const;
     const String& getString() const;
     size_t getSize() const;
     const String& getLocation() const;
