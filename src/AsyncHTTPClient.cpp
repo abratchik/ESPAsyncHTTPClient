@@ -221,6 +221,12 @@ void AsyncHTTPClient::_onConnectCB(void* arg, AsyncClient* client) {
 void AsyncHTTPClient::_onDisconnectCB(void* arg, AsyncClient* client) {
     AsyncHTTPClient* self = (AsyncHTTPClient*)arg;
     self->_handleDisconnect();
+    
+    if(self->_client) {
+        self->_client->close();
+        delete self->_client;
+        self->_client = nullptr;
+    }
 }
 
 void AsyncHTTPClient::_onDataCB(void* arg, AsyncClient* client, void* data, size_t len) {
