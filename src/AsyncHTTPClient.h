@@ -14,6 +14,10 @@
 #define DEBUG_ASYNC_HTTP(...) do { (void)0; } while (0)
 #endif
 
+#ifndef ASYNC_HTTP_CLIENT_MAX_REDIRECTS
+#define ASYNC_HTTP_CLIENT_MAX_REDIRECTS 10
+#endif
+
 /// HTTP codes see RFC7231
 typedef enum {
     HTTP_CODE_CONTINUE = 100,
