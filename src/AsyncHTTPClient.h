@@ -140,25 +140,25 @@ public:
     const String& headerName(size_t i);
     size_t headers();
     bool hasHeader(const String& name);
-    void clearHeaders();
+    void clearHeaders() { _headers.clear(); };
 
     // Configuration
     void setTimeout(uint32_t timeout);
-    void setFollowRedirects(followRedirects_t follow);
-    void setRedirectLimit(uint16_t limit);
-    void setUserAgent(const String& userAgent);
+    void setFollowRedirects(followRedirects_t follow) { _followRedirects = follow; };
+    void setRedirectLimit(uint16_t limit) { _redirectLimit = limit; };
+    void setUserAgent(const String& userAgent) { _userAgent = userAgent; };
     void setAuthorization(const char* user, const char* password);
-    void setAuthorization(const String& auth);
-    void setReuse(bool reuse);
-    void useHTTP10(bool usehttp10);
+    void setAuthorization(const String& auth) { _authorization = auth; };
+    void setReuse(bool reuse) { _reuse = reuse; };
+    void useHTTP10(bool usehttp10) { _useHTTP10 = usehttp10; };
 
     // Status
-    bool connected() const;
-    int getStatusCode() const;
-    const String& getUri() const;
-    const String& getString() const;
-    size_t getSize() const;
-    const String& getLocation() const;
+    bool connected() const { return _client && _client->connected(); };
+    int getStatusCode() const { return _statusCode; };
+    const String& getUri() const { return _uri; };
+    const String& getString() const {return _responseBody; };
+    size_t getSize() const { return _contentLength; };
+    const String& getLocation() const { return _location; };
     void abort();
 
 private:

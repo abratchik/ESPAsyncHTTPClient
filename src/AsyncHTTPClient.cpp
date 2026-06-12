@@ -134,6 +134,7 @@ void AsyncHTTPClient::sendRequest(const char* type, const uint8_t* payload, size
 void AsyncHTTPClient::_sendRequest(const char* type, const String& payload, size_t size, const String& uri, OnResponseCallback onComplete, OnErrorCallback onError) {
     if (_state != STATE_IDLE) {
         _failRequest(ERR_ALREADY);
+        abort();
         return;
     }
 
@@ -468,10 +469,6 @@ bool AsyncHTTPClient::hasHeader(const String& name) {
     return false;
 }
 
-void AsyncHTTPClient::clearHeaders() {
-    _headers.clear();
-}
-
 void AsyncHTTPClient::setTimeout(uint32_t timeout) {
     _timeout = timeout;
     if (_client) {
@@ -479,59 +476,11 @@ void AsyncHTTPClient::setTimeout(uint32_t timeout) {
     }
 }
 
-void AsyncHTTPClient::setFollowRedirects(followRedirects_t follow) {
-    _followRedirects = follow;
-}
-
-void AsyncHTTPClient::setRedirectLimit(uint16_t limit) {
-    _redirectLimit = limit;
-}
-
-void AsyncHTTPClient::setUserAgent(const String& userAgent) {
-    _userAgent = userAgent;
-}
-
 void AsyncHTTPClient::setAuthorization(const char* user, const char* password) {
     String auth = "Basic ";
     // Need base64 encoding, but for now placeholder
     auth += String(user) + ":" + String(password); // TODO: base64 encode
     _authorization = auth;
-}
-
-void AsyncHTTPClient::setAuthorization(const String& auth) {
-    _authorization = auth;
-}
-
-void AsyncHTTPClient::setReuse(bool reuse) {
-    _reuse = reuse;
-}
-
-void AsyncHTTPClient::useHTTP10(bool usehttp10) {
-    _useHTTP10 = usehttp10;
-}
-
-bool AsyncHTTPClient::connected() const {
-    return _client && _client->connected();
-}
-
-int AsyncHTTPClient::getStatusCode() const {
-    return _statusCode;
-}
-
-const String& AsyncHTTPClient::getUri() const {
-    return _uri;
-}
-
-const String& AsyncHTTPClient::getString() const {
-    return _responseBody;
-}
-
-size_t AsyncHTTPClient::getSize() const {
-    return _contentLength;
-}
-
-const String& AsyncHTTPClient::getLocation() const {
-    return _location;
 }
 
 void AsyncHTTPClient::abort() {
