@@ -267,6 +267,8 @@ void AsyncHTTPClient::_handleDisconnect() {
             _onComplete(_statusCode, _responseBody);
         }
         _transitionState(STATE_IDLE);
+    } else if (_state == STATE_CONNECTING || _state == STATE_SENDING_REQUEST || _state == STATE_SENDING_BODY) {
+        _failRequest(ERR_CONN);
     } else if (_state != STATE_IDLE) {
         // If we're in an error state or other state, just go idle
         _transitionState(STATE_IDLE);
